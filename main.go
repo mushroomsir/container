@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
+	"syscall"
 )
 
 func main() {
@@ -20,18 +22,21 @@ func main() {
 
 func parent() {
 	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID,
+	}
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-
 	if err := cmd.Run(); err != nil {
 		fmt.Println("ERROR", err)
 		os.Exit(1)
 	}
-	log.Println("ProcessID:", cmd.Process.Pid)
+	log.Println("container:", cmd.Process.Pid)
 }
 
 func child() {
+
 	cmd := exec.Command(os.Args[2], os.Args[3:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -41,5 +46,6 @@ func child() {
 		fmt.Println("ERROR", err)
 		os.Exit(1)
 	}
-	log.Println("Container ProcessID:", cmd.Process.Pid)
+	syscall.Sethostname([]byte("container" + strconv.Itoa(cmd.Process.Pid)))
+	log.Println("app:", cmd.Process.Pid)
 }
