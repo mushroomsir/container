@@ -32,11 +32,11 @@ func parent() {
 		fmt.Println("ERROR", err)
 		os.Exit(1)
 	}
-	log.Println("container:", cmd.Process.Pid)
+	syscall.Sethostname([]byte("container" + strconv.Itoa(cmd.Process.Pid)))
+	log.Println("container Pid:", cmd.Process.Pid)
 }
 
 func child() {
-
 	cmd := exec.Command(os.Args[2], os.Args[3:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -46,6 +46,5 @@ func child() {
 		fmt.Println("ERROR", err)
 		os.Exit(1)
 	}
-	syscall.Sethostname([]byte("container" + strconv.Itoa(cmd.Process.Pid)))
 	log.Println("app:", cmd.Process.Pid)
 }
