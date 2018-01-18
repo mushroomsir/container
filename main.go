@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/mushroomsir/container/netns"
 	"github.com/mushroomsir/container/network"
 )
 
@@ -18,15 +19,15 @@ func main() {
 		parent()
 	case "child":
 		child()
-	case "bridge":
-		createBridge(os.Args[2])
+	// case "bridge":
+	// 	createBridge(os.Args[2])
 	default:
 		panic("wat should I do")
 	}
 }
 
-func createBridge(pid string) {
-
+func createBridge(pid int) {
+	//log.Println(pid)
 	bridgeIP, bridgeSubnet, err := net.ParseCIDR("10.10.10.1/24")
 	check(err)
 
@@ -34,19 +35,24 @@ func createBridge(pid string) {
 	check(err)
 
 	netConfig := network.NetworkConfig{
-		BridgeName:     "brgtest",
+		BridgeName:     "brg0",
 		BridgeIP:       bridgeIP,
 		ContainerIP:    containerIP,
 		Subnet:         bridgeSubnet,
-		VethNamePrefix: "vethtest",
+		VethNamePrefix: "veth",
 	}
-	processID, err := strconv.Atoi(pid)
-	check(err)
+	// processID, err := strconv.Atoi(pid)
+	// check(err)
 
 	bridge := network.NewBridge()
 	veth := network.NewVeth()
-	network.ApplyHost(brdige, veth, netConfig, processID)
-	network.ApplyContainer(netConfig, processID)
+	err = network.ApplyHost(bridge, veth, netConfig, pid)
+	check(err)
+
+	netnsExecer := &netns.Execer{}
+
+	err = network.ApplyContainer(netConfig, pid, netnsExecer)
+	check(err)
 }
 func parent() {
 	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
@@ -56,11 +62,14 @@ func parent() {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		fmt.Println("ERROR", err)
-		os.Exit(1)
-	}
+	err := cmd.Start()
+	check(err)
+
 	log.Println(cmd.Process.Pid)
+	createBridge(cmd.Process.Pid)
+
+	err = cmd.Wait()
+	check(err)
 }
 
 func child() {
@@ -79,7 +88,7 @@ func child() {
 
 func check(err error) {
 	if err != nil {
-		fmt.Printf("ERROR - %s\n", err.Error())
-		os.Exit(1)
+		//fmt.Printf("ERROR - %s\n", err.Error())
+		panic(err)
 	}
 }

@@ -1,9 +1,12 @@
 package network
 
 import (
+	"fmt"
 	"net"
 	"os"
-	"fmt"
+
+	"github.com/mushroomsir/container/netns"
+	"github.com/vishvananda/netlink"
 )
 
 type NetworkConfig struct {
@@ -14,7 +17,7 @@ type NetworkConfig struct {
 	VethNamePrefix string
 }
 
-func ApplyHost(bridge *Bridge,veth *Veth,netConfig NetworkConfig,  pid int) error {
+func ApplyHost(bridge *Bridge, veth *Veth, netConfig NetworkConfig, pid int) error {
 	b, err := bridge.Create(netConfig.BridgeName, netConfig.BridgeIP, netConfig.Subnet)
 	if err != nil {
 		return err
@@ -30,14 +33,14 @@ func ApplyHost(bridge *Bridge,veth *Veth,netConfig NetworkConfig,  pid int) erro
 		return err
 	}
 
-	err = h.VethCreator.MoveToNetworkNamespace(containerVeth, pid)
+	err = veth.MoveToNetworkNamespace(containerVeth, pid)
 	if err != nil {
 		return err
 	}
 
 	return nil
 }
-func ApplyContainer(netConfig NetworkConfig, pid int) error {
+func ApplyContainer(netConfig NetworkConfig, pid int, netnsExecer *netns.Execer) error {
 	netnsFile, err := os.Open(fmt.Sprintf("/proc/%d/ns/net", pid))
 	defer netnsFile.Close()
 	if err != nil {
@@ -70,5 +73,5 @@ func ApplyContainer(netConfig NetworkConfig, pid int) error {
 		return netlink.RouteAdd(route)
 	}
 
-	return c.NetnsExecer.Exec(netnsFile, cbFunc)
+	return netnsExecer.Exec(netnsFile, cbFunc)
 }
