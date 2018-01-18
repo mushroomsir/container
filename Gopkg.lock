@@ -10,15 +10,9 @@
   ]
   revision = "a98f31ffc7e9a462941bb5dfbb0f8a34e83eb1bf"
 
-[[projects]]
-  branch = "master"
-  name = "github.com/vishvananda/netns"
-  packages = ["."]
-  revision = "be1fbeda19366dea804f00efff2dd73a1642fdcc"
-
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f83962022568ffec5dd49ecade627dcf1625cd0d7a3501653177301051364501"
+  inputs-digest = "1963072b74ba25005b0d8bd508091c879a5ef441dfd2fe07fbe749b120dcfdf1"
   solver-name = "gps-cdcl"
   solver-version = 1

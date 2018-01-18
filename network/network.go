@@ -3,9 +3,8 @@ package network
 import (
 	"fmt"
 	"net"
-	"os"
+	"time"
 
-	"github.com/mushroomsir/container/netns"
 	"github.com/vishvananda/netlink"
 )
 
@@ -40,38 +39,32 @@ func ApplyHost(bridge *Bridge, veth *Veth, netConfig NetworkConfig, pid int) err
 
 	return nil
 }
-func ApplyContainer(netConfig NetworkConfig, pid int, netnsExecer *netns.Execer) error {
-	netnsFile, err := os.Open(fmt.Sprintf("/proc/%d/ns/net", pid))
-	defer netnsFile.Close()
+func ApplyContainer(netConfig NetworkConfig) error {
+
+	time.Sleep(200 * time.Millisecond)
+
+	//cbFunc := func() error {
+	containerVethName := fmt.Sprintf("%s1", netConfig.VethNamePrefix)
+	link, err := netlink.LinkByName(containerVethName)
 	if err != nil {
-		return fmt.Errorf("Unable to find network namespace for process with pid '%d'", pid)
+		return fmt.Errorf("Container veth '%s' not found", containerVethName)
 	}
 
-	cbFunc := func() error {
-		containerVethName := fmt.Sprintf("%s1", netConfig.VethNamePrefix)
-		link, err := netlink.LinkByName(containerVethName)
-		if err != nil {
-			return fmt.Errorf("Container veth '%s' not found", containerVethName)
-		}
-
-		addr := &netlink.Addr{IPNet: &net.IPNet{IP: netConfig.ContainerIP, Mask: netConfig.Subnet.Mask}}
-		err = netlink.AddrAdd(link, addr)
-		if err != nil {
-			return fmt.Errorf("Unable to assign IP address '%s' to %s", netConfig.ContainerIP, containerVethName)
-		}
-
-		if err := netlink.LinkSetUp(link); err != nil {
-			return err
-		}
-
-		route := &netlink.Route{
-			Scope:     netlink.SCOPE_UNIVERSE,
-			LinkIndex: link.Attrs().Index,
-			Gw:        netConfig.BridgeIP,
-		}
-
-		return netlink.RouteAdd(route)
+	addr := &netlink.Addr{IPNet: &net.IPNet{IP: netConfig.ContainerIP, Mask: netConfig.Subnet.Mask}}
+	err = netlink.AddrAdd(link, addr)
+	if err != nil {
+		return fmt.Errorf("Unable to assign IP address '%s' to %s", netConfig.ContainerIP, containerVethName)
 	}
 
-	return netnsExecer.Exec(netnsFile, cbFunc)
+	if err := netlink.LinkSetUp(link); err != nil {
+		return err
+	}
+
+	route := &netlink.Route{
+		Scope:     netlink.SCOPE_UNIVERSE,
+		LinkIndex: link.Attrs().Index,
+		Gw:        netConfig.BridgeIP,
+	}
+
+	return netlink.RouteAdd(route)
 }

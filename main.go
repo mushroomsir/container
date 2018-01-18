@@ -6,53 +6,49 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
 	"syscall"
 
-	"github.com/mushroomsir/container/netns"
 	"github.com/mushroomsir/container/network"
 )
 
-func main() {
-	switch os.Args[1] {
-	case "run":
-		parent()
-	case "child":
-		child()
-	// case "bridge":
-	// 	createBridge(os.Args[2])
-	default:
-		panic("wat should I do")
-	}
-}
+var netConfig network.NetworkConfig
 
-func createBridge(pid int) {
-	//log.Println(pid)
+func init() {
 	bridgeIP, bridgeSubnet, err := net.ParseCIDR("10.10.10.1/24")
 	check(err)
 
 	containerIP, _, err := net.ParseCIDR("10.10.10.2/24")
 	check(err)
 
-	netConfig := network.NetworkConfig{
+	netConfig = network.NetworkConfig{
 		BridgeName:     "brg0",
 		BridgeIP:       bridgeIP,
 		ContainerIP:    containerIP,
 		Subnet:         bridgeSubnet,
 		VethNamePrefix: "veth",
 	}
-	// processID, err := strconv.Atoi(pid)
-	// check(err)
+
+}
+func main() {
+	switch os.Args[1] {
+	case "run":
+		parent()
+	case "child":
+		child()
+	default:
+		panic("wat should I do")
+	}
+}
+
+func createBridge(pid int) {
 
 	bridge := network.NewBridge()
 	veth := network.NewVeth()
-	err = network.ApplyHost(bridge, veth, netConfig, pid)
+	err := network.ApplyHost(bridge, veth, netConfig, pid)
 	check(err)
 
-	netnsExecer := &netns.Execer{}
-
-	err = network.ApplyContainer(netConfig, pid, netnsExecer)
-	check(err)
 }
 func parent() {
 	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
@@ -73,17 +69,42 @@ func parent() {
 }
 
 func child() {
-	syscall.Sethostname([]byte("container" + strconv.Itoa(os.Getgid())))
 	cmd := exec.Command(os.Args[2], os.Args[3:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
+	initContainer()
 
 	if err := cmd.Run(); err != nil {
 		fmt.Println("ERROR", err)
 		os.Exit(1)
 	}
 	log.Println("app:", cmd.Process.Pid)
+}
+
+func initContainer() {
+	name := "container" + strconv.Itoa(os.Getgid())
+	syscall.Sethostname([]byte(name))
+
+	pwd, err := os.Getwd()
+	if err != nil {
+		panic(fmt.Sprintf("get pwd err: %v\n", err))
+	}
+	target := path.Join(pwd, "rootfs")
+	if err := syscall.t(target); err != nil {
+		panic(fmt.Sprintf("chroot err: %v\n", err))
+	}
+	if err := os.Chdir("/"); err != nil {
+		panic(fmt.Sprintf("chdir err: %v\n", err))
+	}
+
+	if err := syscall.Mount("proc", "proc", "proc", 0, ""); err != nil {
+		panic(fmt.Sprintf("failed to mount proc to %s: %v", target, err))
+	}
+
+	err = network.ApplyContainer(netConfig)
+	check(err)
 }
 
 func check(err error) {
