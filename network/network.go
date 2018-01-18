@@ -1,8 +1,11 @@
 package network
 
 import (
-	"github.com/teddyking/netsetgo"
+	"net"
+	"os"
+	"fmt"
 )
+
 type NetworkConfig struct {
 	BridgeName     string
 	BridgeIP       net.IP
@@ -12,7 +15,7 @@ type NetworkConfig struct {
 }
 
 func ApplyHost(bridge *Bridge,veth *Veth,netConfig NetworkConfig,  pid int) error {
-	bridge, err := bridge.Create(netConfig.BridgeName, netConfig.BridgeIP, netConfig.Subnet)
+	b, err := bridge.Create(netConfig.BridgeName, netConfig.BridgeIP, netConfig.Subnet)
 	if err != nil {
 		return err
 	}
@@ -22,7 +25,7 @@ func ApplyHost(bridge *Bridge,veth *Veth,netConfig NetworkConfig,  pid int) erro
 		return err
 	}
 
-	err = h.BridgeCreator.Attach(bridge, hostVeth)
+	err = bridge.Attach(b, hostVeth)
 	if err != nil {
 		return err
 	}
