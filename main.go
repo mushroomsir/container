@@ -62,6 +62,12 @@ func parent() {
 	check(err)
 
 	log.Println(cmd.Process.Pid)
+
+	iptablesRules := network.GetIptablesRules("10.10.10.1/24", "eth0", "container0")
+	if err := network.SetIptables(iptablesRules); err != nil {
+		log.Println(fmt.Errorf("set iptables err: %v", err))
+	}
+
 	createBridge(cmd.Process.Pid)
 
 	err = cmd.Wait()
@@ -92,7 +98,7 @@ func initContainer() {
 		panic(fmt.Sprintf("get pwd err: %v\n", err))
 	}
 	target := path.Join(pwd, "rootfs")
-	if err := syscall.t(target); err != nil {
+	if err := syscall.Chroot(target); err != nil {
 		panic(fmt.Sprintf("chroot err: %v\n", err))
 	}
 	if err := os.Chdir("/"); err != nil {
